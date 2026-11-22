@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { primeAudio } from '@/lib/sound';
-import { ChefHat, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { MeltingCheeseLogo } from '@/components/MeltingCheeseLogo';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -73,16 +74,18 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0c0d10] flex flex-col items-center justify-center p-4 sm:p-6 selection:bg-amber-500 selection:text-black">
       <div className="w-full max-w-md bg-[#14151b] border-2 border-stone-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-        {/* Branding */}
+        {/* Branding with Melting Cheese POS SVG Logo */}
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mx-auto shadow-xl shadow-amber-500/20">
-            <ChefHat className="w-9 h-9 text-stone-950 stroke-[2.5]" />
+          <div className="flex justify-center">
+            <div className="p-1 rounded-3xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-2xl shadow-amber-500/20 inline-block">
+              <MeltingCheeseLogo size={80} />
+            </div>
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase">
               Melting Cheese
             </h1>
-            <div className="inline-block px-3 py-1 mt-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold text-xs tracking-wider">
+            <div className="inline-block px-3 py-1 mt-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold text-xs tracking-wider uppercase">
               KITCHEN POS & ADMIN PORTAL
             </div>
           </div>
@@ -137,7 +140,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="min-h-[48px] px-3.5 absolute right-0 top-0 bottom-0 text-stone-400 hover:text-white flex items-center justify-center"
+                className="min-h-[48px] px-3.5 absolute right-0 top-0 bottom-0 text-stone-400 hover:text-white flex items-center justify-center cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>

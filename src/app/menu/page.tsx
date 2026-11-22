@@ -1,13 +1,24 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { POSHeader } from '@/components/POSHeader';
 import { MenuItem } from '@/types';
 import { FALLBACK_MENU_ITEMS } from '@/lib/menu-data';
 import { primeAudio } from '@/lib/sound';
-import { Loader2, Search, Check, X, Sparkles, Flame, CheckCircle2, AlertOctagon } from 'lucide-react';
+import { 
+  Loader2, 
+  Search, 
+  Check, 
+  X, 
+  Camera, 
+  UploadCloud, 
+  Image as ImageIcon, 
+  CheckCircle2, 
+  AlertOctagon, 
+  AlertCircle 
+} from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
 const CATEGORY_ORDER = [
@@ -29,7 +40,13 @@ export default function MenuStockManager() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [updatingStockId, setUpdatingStockId] = useState<string | null>(null);
+
+  // Photo upload states
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   // 1. Authenticate user
   useEffect(() => {
@@ -83,7 +100,7 @@ export default function MenuStockManager() {
   const handleToggleStock = async (item: MenuItem) => {
     primeAudio();
     const newStatus = !item.is_available;
-    setUpdatingId(item.id);
+    setUpdatingStockId(item.id);
 
     // Optimistic UI update
     setItems((prev) =>
@@ -110,7 +127,94 @@ export default function MenuStockManager() {
         prev.map((i) => (i.id === item.id ? { ...i, is_available: !newStatus } : i))
       );
     } finally {
-      setUpdatingId(null);
+      setUpdatingStockId(null);
+    }
+  };
+
+  // 4. Handle Real Dish Photo Upload to Supabase Storage 'menu-images'
+  const handlePhotoSelect = async (
+    item: MenuItem,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so staff can select the same file again if desired
+    e.target.value = '';
+
+    // Validate mime type
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validMimes.includes(file.type)) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Please select a valid image file (JPG, PNG, or WEBP).',
+      });
+      return;
+    }
+
+    // Limit size to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Image size exceeds 10MB limit. Please upload a smaller photo.',
+      });
+      return;
+    }
+
+    setUploadingPhotoId(item.id);
+    setFeedbackMessage(null);
+
+    try {
+      // Determine clean extension
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const cleanName = item.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const filePath = `${cleanName}-${Date.now()}.${fileExt}`;
+
+      // Upload to public Supabase Storage bucket 'menu-images'
+      const { error: uploadError } = await supabase.storage
+        .from('menu-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      // Retrieve public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('menu-images').getPublicUrl(filePath);
+
+      // Immediately update menu_items record
+      const { error: dbError } = await supabase
+        .from('menu_items')
+        .update({ image: publicUrl })
+        .eq('id', item.id);
+
+      if (dbError) {
+        throw new Error(`Database error: ${dbError.message}`);
+      }
+
+      // Optimistically update local state so image refreshes immediately
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, image: publicUrl } : i))
+      );
+
+      setFeedbackMessage({
+        type: 'success',
+        text: `Photo updated successfully for "${item.name}"!`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Photo upload failed.';
+      console.error('Photo upload error:', err);
+      setFeedbackMessage({
+        type: 'error',
+        text: `Upload failed: ${msg} (Make sure the 'menu-images' storage bucket exists in Supabase)`,
+      });
+    } finally {
+      setUploadingPhotoId(null);
     }
   };
 
@@ -166,19 +270,46 @@ export default function MenuStockManager() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
-        {/* 2. Stock Overview Banner */}
+        {/* Toast Feedback Notification */}
+        {feedbackMessage && (
+          <div
+            className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 shadow-xl transition-all ${
+              feedbackMessage.type === 'success'
+                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200'
+                : 'bg-rose-950/80 border-rose-500 text-rose-200'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 text-sm sm:text-base font-extrabold">
+              {feedbackMessage.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              )}
+              <span>{feedbackMessage.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFeedbackMessage(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-stone-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* 2. Stock & Photo Overview Banner */}
         <div className="bg-[#14151b] border-2 border-stone-800 rounded-3xl p-4 sm:p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                1-Tap Menu Stock Manager
+                Menu Stock & Dish Photo Manager
               </h2>
               <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-black">
                 {items.length} Items Total
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-stone-400 font-medium max-w-xl">
-              Tap any item to instantly toggle <strong className="text-emerald-400">IN STOCK</strong> or <strong className="text-rose-400">SOLD OUT</strong>. Updates reflect immediately on customer storefront menus.
+            <p className="text-xs sm:text-sm text-stone-400 font-medium max-w-2xl">
+              1-Tap toggle <strong className="text-emerald-400">IN STOCK</strong> / <strong className="text-rose-400">SOLD OUT</strong>, and tap <strong className="text-amber-400">&quot;Change Photo&quot;</strong> on any dish to upload genuine kitchen photos directly to Supabase Storage.
             </p>
           </div>
 
@@ -240,7 +371,7 @@ export default function MenuStockManager() {
               <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search dish to toggle..."
+                placeholder="Search dish to edit..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full min-h-[48px] pl-10 pr-4 py-2.5 bg-[#181920] border-2 border-stone-800 focus:border-amber-500 rounded-2xl text-sm text-white placeholder:text-stone-500 focus:outline-none transition-colors"
@@ -284,83 +415,151 @@ export default function MenuStockManager() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {categoryItems.map((item) => {
-                      const isUpdating = updatingId === item.id;
+                      const isUpdatingStock = updatingStockId === item.id;
+                      const isUploadingPhoto = uploadingPhotoId === item.id;
                       const isAvailable = item.is_available;
 
                       return (
                         <div
                           key={item.id}
-                          className={`rounded-2xl p-3.5 sm:p-4 border-2 transition-all flex items-center justify-between gap-3 shadow-md ${
+                          className={`rounded-3xl p-4 sm:p-5 border-2 transition-all flex flex-col justify-between gap-4 shadow-lg ${
                             isAvailable
                               ? 'bg-[#181920] border-stone-800 hover:border-stone-700'
                               : 'bg-[#201214] border-rose-900/60 opacity-90'
                           }`}
                         >
-                          {/* Item Info */}
-                          <div className="flex items-center gap-3 min-w-0">
-                            {/* Dietary badge */}
-                            <div className="shrink-0">
-                              <span
-                                className={`inline-flex items-center justify-center w-5 h-5 rounded-md border-2 ${
-                                  item.dietary === 'veg'
-                                    ? 'border-emerald-500 bg-emerald-950/60'
-                                    : 'border-rose-500 bg-rose-950/60'
-                                }`}
-                                title={item.dietary === 'veg' ? 'Vegetarian' : 'Non-Vegetarian'}
-                              >
-                                <span
-                                  className={`w-2 h-2 rounded-full ${
-                                    item.dietary === 'veg' ? 'bg-emerald-400' : 'bg-rose-500'
-                                  }`}
-                                />
-                              </span>
-                            </div>
+                          {/* Hidden File Input for this item */}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/jpg"
+                            ref={(el) => {
+                              fileInputRefs.current[item.id] = el;
+                            }}
+                            onChange={(e) => handlePhotoSelect(item, e)}
+                            className="hidden"
+                          />
 
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-extrabold text-sm sm:text-base text-white truncate">
-                                  {item.name}
-                                </h4>
-                                {item.badge && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                                    {item.badge}
-                                  </span>
+                          {/* Top Section: Photo Thumbnail + Details */}
+                          <div className="flex items-start gap-4">
+                            {/* Food Photo with Overlay Click Target */}
+                            <div className="relative group shrink-0">
+                              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-stone-900 border-2 border-stone-700/80 shadow-md relative">
+                                {item.image ? (
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center text-stone-600 gap-1">
+                                    <ImageIcon className="w-8 h-8" />
+                                    <span className="text-[10px] font-bold">No Photo</span>
+                                  </div>
+                                )}
+
+                                {/* Loading Overlay during photo upload */}
+                                {isUploadingPhoto && (
+                                  <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-amber-400 gap-1">
+                                    <Loader2 className="w-6 h-6 animate-spin" />
+                                    <span className="text-[9px] font-black uppercase">Uploading</span>
+                                  </div>
                                 )}
                               </div>
-                              <div className="text-xs font-bold text-stone-400 font-mono mt-0.5">
-                                ₹{item.base_price} {item.customizable && '• Customizable'}
+                            </div>
+
+                            {/* Item Details */}
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2">
+                                {/* Dietary Badge */}
+                                <span
+                                  className={`inline-flex items-center justify-center w-5 h-5 rounded-md border-2 shrink-0 ${
+                                    item.dietary === 'veg'
+                                      ? 'border-emerald-500 bg-emerald-950/60'
+                                      : 'border-rose-500 bg-rose-950/60'
+                                  }`}
+                                  title={item.dietary === 'veg' ? 'Vegetarian' : 'Non-Vegetarian'}
+                                >
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      item.dietary === 'veg' ? 'bg-emerald-400' : 'bg-rose-500'
+                                    }`}
+                                  />
+                                </span>
+
+                                <h4 className="font-black text-base sm:text-lg text-white truncate">
+                                  {item.name}
+                                </h4>
                               </div>
+
+                              {item.badge && (
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                  {item.badge}
+                                </span>
+                              )}
+
+                              <div className="text-sm font-black text-amber-400 font-mono">
+                                ₹{item.base_price} {item.customizable && <span className="text-stone-400 font-sans font-medium text-xs">• Customizable</span>}
+                              </div>
+
+                              <p className="text-xs text-stone-400 line-clamp-2 leading-relaxed">
+                                {item.description}
+                              </p>
                             </div>
                           </div>
 
-                          {/* 1-Tap Stock Switch Button - Min 48px Tap Target */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStock(item)}
-                            disabled={isUpdating}
-                            title={isAvailable ? 'Click to Mark as SOLD OUT' : 'Click to Mark as IN STOCK'}
-                            className={`min-h-[48px] px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 shrink-0 transition-all active:scale-95 shadow-lg border-2 cursor-pointer ${
-                              isAvailable
-                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-emerald-900/40'
-                                : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-rose-900/40 animate-pulse'
-                            }`}
-                          >
-                            {isUpdating ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : isAvailable ? (
-                              <>
-                                <Check className="w-5 h-5 stroke-[3]" />
-                                <span>IN STOCK</span>
-                              </>
-                            ) : (
-                              <>
-                                <X className="w-5 h-5 stroke-[3]" />
-                                <span>SOLD OUT</span>
-                              </>
-                            )}
-                          </button>
+                          {/* Action Buttons Row: 1-Tap "Change Photo" + 1-Tap "IN STOCK / SOLD OUT" (Min 48px Tap Targets) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-stone-800/80">
+                            {/* "Change Photo" Button (Uploads to 'menu-images' bucket) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                fileInputRefs.current[item.id]?.click();
+                              }}
+                              disabled={isUploadingPhoto}
+                              className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-stone-200 hover:text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 border-2 border-stone-700/80 hover:border-amber-500/50 shadow-sm transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                            >
+                              {isUploadingPhoto ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                                  <span>Uploading...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="w-4 h-4 text-amber-400" />
+                                  <span>Change Photo</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* 1-Tap In Stock / Sold Out Toggle Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStock(item)}
+                              disabled={isUpdatingStock}
+                              title={isAvailable ? 'Click to Mark as SOLD OUT' : 'Click to Mark as IN STOCK'}
+                              className={`min-h-[48px] px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg border-2 cursor-pointer ${
+                                isAvailable
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400 shadow-emerald-900/40'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400 shadow-rose-900/40 animate-pulse'
+                              }`}
+                            >
+                              {isUpdatingStock ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                              ) : isAvailable ? (
+                                <>
+                                  <Check className="w-5 h-5 stroke-[3]" />
+                                  <span>IN STOCK</span>
+                                </>
+                              ) : (
+                                <>
+                                  <X className="w-5 h-5 stroke-[3]" />
+                                  <span>SOLD OUT</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

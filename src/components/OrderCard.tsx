@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Phone, MapPin, Clock, Truck, Check, QrCode, Banknote, AlertTriangle, CheckCircle, Flame, ExternalLink, XCircle } from 'lucide-react';
+import { Phone, MapPin, Clock, Truck, Check, QrCode, Banknote, CheckCircle, Flame, ExternalLink, XCircle, MessageSquare } from 'lucide-react';
 import { Order, OrderStatus, PaymentStatus } from '@/types';
+import { buildCustomerWhatsAppUrl, getFriendlyStatusText } from '@/lib/whatsapp';
 
 interface OrderCardProps {
   order: Order;
@@ -60,6 +61,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   }
 
   const mapsUrl = order.gps_link || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address + ', Bhadohi')}`;
+  const whatsAppUrl = buildCustomerWhatsAppUrl(order);
 
   return (
     <div className={`rounded-3xl p-4 sm:p-6 transition-all duration-300 flex flex-col justify-between gap-4 ${cardTheme}`}>
@@ -150,14 +152,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({
           <span className="font-medium leading-relaxed">{order.delivery_address}</span>
         </div>
 
-        {/* Action Row: 1-Tap Call & 1-Tap Open Maps Pin (Min 48px height) */}
+        {/* 1-Tap Action Row: Call, Maps Pin, and WhatsApp Business Status Update (Min 48px height) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
           {/* Call Customer Button */}
           <a
             href={`tel:${order.customer_phone}`}
-            className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all border border-emerald-400/40"
+            className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-stone-200 hover:text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-all border border-stone-700"
           >
-            <Phone className="w-5 h-5 shrink-0 animate-pulse" />
+            <Phone className="w-4 h-4 shrink-0 text-emerald-400" />
             <span>Call {order.customer_phone}</span>
           </a>
 
@@ -166,13 +168,25 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all border border-blue-400/40"
+            className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-stone-200 hover:text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-all border border-stone-700"
           >
-            <MapPin className="w-5 h-5 shrink-0" />
+            <MapPin className="w-4 h-4 shrink-0 text-blue-400" />
             <span>Open Maps Pin</span>
-            <ExternalLink className="w-4 h-4 opacity-70" />
+            <ExternalLink className="w-3.5 h-3.5 opacity-60" />
           </a>
         </div>
+
+        {/* 1-TAP WHATSAPP BUSINESS STATUS UPDATE BUTTON (Min 48px height) */}
+        <a
+          href={whatsAppUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full min-h-[48px] px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-stone-950 font-black text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-950/40 border-2 border-emerald-300 transition-all uppercase tracking-wide cursor-pointer"
+          title={`Send WhatsApp update: Order #${order.order_number} is ${getFriendlyStatusText(order.order_status)}`}
+        >
+          <MessageSquare className="w-5 h-5 shrink-0 stroke-[2.5]" />
+          <span>Notify on WhatsApp</span>
+        </a>
 
         {/* 1-Tap Mark UPI Paid Button if unpaid UPI */}
         {order.payment_method === 'UPI' && order.payment_status === 'PENDING' && (
@@ -314,7 +328,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                   onUpdateStatus(order.id, 'CANCELLED');
                 }
               }}
-              className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-transparent hover:bg-rose-950/50 text-stone-500 hover:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition-colors"
+              className="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-transparent hover:bg-rose-950/50 text-stone-500 hover:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <XCircle className="w-4 h-4" />
               <span>Cancel Order</span>

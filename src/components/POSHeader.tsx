@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChefHat, ShoppingBag, UtensilsCrossed, LogOut, Volume2, VolumeX, BellRing } from 'lucide-react';
+import { ShoppingBag, UtensilsCrossed, LogOut, Volume2, BellRing } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { playKitchenChime, primeAudio } from '@/lib/sound';
+import { MeltingCheeseLogo } from '@/components/MeltingCheeseLogo';
 
 interface POSHeaderProps {
   userEmail?: string | null;
@@ -40,22 +41,22 @@ export const POSHeader: React.FC<POSHeaderProps> = ({ userEmail, activeOrdersCou
     <header className="sticky top-0 z-40 bg-[#121318]/95 backdrop-blur-md border-b-2 border-stone-800 shadow-md">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Brand & Kitchen Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-              <ChefHat className="w-7 h-7 text-stone-950 stroke-[2.5]" />
+          {/* Brand & Kitchen Title with Melting Cheese POS SVG Logo */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 p-0.5 flex items-center justify-center shadow-lg shadow-amber-500/25 shrink-0 group-hover:scale-105 transition-transform">
+              <MeltingCheeseLogo size={42} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-black text-white tracking-wide uppercase">
+                <h1 className="text-lg sm:text-xl font-black text-white tracking-wide uppercase group-hover:text-amber-400 transition-colors">
                   Melting Cheese
                 </h1>
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-extrabold tracking-wider">
-                  BHADOHI POS
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-black tracking-wider">
+                  KITCHEN POS
                 </span>
               </div>
               <div className="text-[12px] text-stone-400 font-medium flex items-center gap-2 mt-0.5">
-                <span>Kitchen Terminal</span>
+                <span>Bhadohi Terminal</span>
                 {userEmail && (
                   <>
                     <span className="text-stone-600">•</span>
@@ -66,7 +67,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({ userEmail, activeOrdersCou
                 )}
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Navigation & Actions - Min 48px Tap Targets */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
