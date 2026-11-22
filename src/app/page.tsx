@@ -255,8 +255,8 @@ export default function KitchenOrdersBoard() {
       {/* 1. POS Top Navigation */}
       <POSHeader userEmail={user.email} activeOrdersCount={activeCount} />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
+      {/* Main Content Area: Responsive Desktop PC + Mobile Layout */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-6">
         {/* 2. Top Summary Bar (Today's Orders, Today's Revenue, Pending UPI Payments) */}
         <TopSummaryBar
           orders={orders}
@@ -423,7 +423,7 @@ export default function KitchenOrdersBoard() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             {filteredOrders.map((order) => (
               <OrderCard
                 key={order.id}

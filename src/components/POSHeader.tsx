@@ -39,7 +39,7 @@ export const POSHeader: React.FC<POSHeaderProps> = ({ userEmail, activeOrdersCou
 
   return (
     <header className="sticky top-0 z-40 bg-[#121318]/95 backdrop-blur-md border-b-2 border-stone-800 shadow-md">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Brand & Kitchen Title with Melting Cheese POS SVG Logo */}
           <Link href="/" className="flex items-center gap-3 group">

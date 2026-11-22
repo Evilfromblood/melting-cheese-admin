@@ -40,14 +40,12 @@ A dedicated, ultra-simple, high-contrast, standalone **Kitchen POS & Admin Web A
   - **Mark UPI Paid:** 1-tap button to instantly verify and mark pending UPI payments as `PAID`.
   - **Stage Advancement:** 1-tap `ACCEPT ORDER` → `MARK OUT FOR DELIVERY` → `MARK DELIVERED`.
 
-### 3. 1-Tap Menu Stock & Photo Manager (`/menu`)
-- Displays all 29 menu items grouped into categories:
-  - **Pizza** (8-inch crusts, customizable)
-  - **Burgers**
-  - **Snacks**
-  - **Chicken Wings & Strips**
-  - **Mocktails**
-- **Upload Real Dish Photos:** 1-tap **"Change Photo"** button on every dish that uploads an image file (`jpg/png/webp`) directly to the public Supabase Storage bucket `menu-images` and updates `menu_items.image` with the public URL immediately.
+### 3. Full Menu Management & Dish Photo Manager (`/menu`)
+- **Responsive Desktop PC + Mobile Grid:** Spacious multi-column display (`lg:grid-cols-2 xl:grid-cols-3 max-w-7xl mx-auto`) for kitchen monitors and desktop workstations, while retaining large 48px touch targets for mobile.
+- **"+ Add New Dish" Modal:** Complete creation modal with Dish Name, Category (presets + custom), Dietary (Veg / Non-Veg toggle), Base Price (₹), Description, Customizability, Highlight Badge (Bestseller, Chef Special, Spicy), and instant image upload to Supabase Storage `menu-images`.
+- **Inline Edit Price:** 1-tap price editor on every dish card allowing staff to adjust base price with immediate Supabase update.
+- **Delete Dish:** Permanent deletion button (with confirmation) executing `supabase.from('menu_items').delete().eq('id', item.id)`.
+- **Upload Real Dish Photos:** 1-tap **"Change Photo"** button on every dish uploading directly to the public Supabase Storage bucket `menu-images` and updating `menu_items.image`.
 - **1-Tap Stock Switch:** Instant `IN STOCK` (Green) / `SOLD OUT` (Red) toggle updating `is_available` in Supabase with optimistic UI updates.
 - Real-time stock counters (Total Items, In Stock count, Sold Out count) and quick dish search.
 
