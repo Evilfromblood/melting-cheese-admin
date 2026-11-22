@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingBag, UtensilsCrossed, LogOut, Volume2, BellRing } from 'lucide-react';
+import { ShoppingBag, UtensilsCrossed, LogOut, Volume2, BellRing, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { playKitchenChime, primeAudio } from '@/lib/sound';
 import { MeltingCheeseLogo } from '@/components/MeltingCheeseLogo';
@@ -18,6 +18,83 @@ export const POSHeader: React.FC<POSHeaderProps> = ({ userEmail, activeOrdersCou
   const router = useRouter();
   const supabase = createClient();
   const [audioTested, setAudioTested] = useState(false);
+
+  // Kitchen Open / Closed Master Switch state
+  const [isKitchenOpen, setIsKitchenOpen] = useState<boolean>(true);
+  const [isUpdatingKitchenStatus, setIsUpdatingKitchenStatus] = useState<boolean>(false);
+
+  // Fetch initial kitchen status and subscribe to realtime updates
+  useEffect(() => {
+    async function fetchKitchenStatus() {
+      try {
+        const { data, error } = await supabase
+          .from('store_settings')
+          .select('is_open')
+          .eq('id', 1)
+          .single();
+
+        if (!error && data) {
+          setIsKitchenOpen(Boolean(data.is_open));
+        }
+      } catch (err) {
+        console.warn('Could not fetch store_settings note:', err);
+      }
+    }
+
+    fetchKitchenStatus();
+
+    // Subscribe to store_settings changes in realtime
+    const channel = supabase
+      .channel('kitchen:store_settings_feed')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_settings' },
+        (payload) => {
+          const updated = payload.new as { id?: number; is_open?: boolean };
+          if (updated && (updated.id === 1 || updated.id === undefined)) {
+            if (typeof updated.is_open === 'boolean') {
+              setIsKitchenOpen(updated.is_open);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
+
+  // Master switch toggle handler
+  const handleToggleKitchenStatus = async () => {
+    primeAudio();
+    const nextStatus = !isKitchenOpen;
+
+    // Optimistic UI update
+    setIsKitchenOpen(nextStatus);
+    setIsUpdatingKitchenStatus(true);
+
+    try {
+      const { error } = await supabase
+        .from('store_settings')
+        .update({
+          is_open: nextStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1);
+
+      if (error) {
+        console.error('Failed to update kitchen open/closed status:', error);
+        // Rollback on error
+        setIsKitchenOpen(!nextStatus);
+      }
+    } catch (err) {
+      console.error('Error toggling kitchen status:', err);
+      setIsKitchenOpen(!nextStatus);
+    } finally {
+      setIsUpdatingKitchenStatus(false);
+    }
+  };
 
   const handleTestSound = () => {
     primeAudio();
@@ -69,8 +146,35 @@ export const POSHeader: React.FC<POSHeaderProps> = ({ userEmail, activeOrdersCou
             </div>
           </Link>
 
-          {/* Navigation & Actions - Min 48px Tap Targets */}
+          {/* Navigation & Operational Controls - Min 48px Tap Targets */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {/* 1. MASTER SWITCH: KITCHEN OPEN (Green) / KITCHEN CLOSED (Red) */}
+            <button
+              type="button"
+              onClick={handleToggleKitchenStatus}
+              disabled={isUpdatingKitchenStatus}
+              title={isKitchenOpen ? 'Tap to Pause Orders (Close Kitchen)' : 'Tap to Resume Orders (Open Kitchen)'}
+              className={`min-h-[48px] px-4 py-2 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2.5 shadow-lg border-2 transition-all active:scale-95 cursor-pointer uppercase tracking-wider ${
+                isKitchenOpen
+                  ? 'bg-emerald-950/80 border-emerald-400 text-emerald-300 hover:bg-emerald-900/60 shadow-emerald-950/50'
+                  : 'bg-rose-950/90 border-rose-500 text-rose-300 hover:bg-rose-900/60 shadow-rose-950/60 animate-pulse'
+              }`}
+            >
+              {isUpdatingKitchenStatus ? (
+                <Loader2 className="w-4 h-4 animate-spin text-current" />
+              ) : isKitchenOpen ? (
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+                </span>
+              ) : (
+                <span className="relative flex h-3 w-3">
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                </span>
+              )}
+              <span>{isKitchenOpen ? 'KITCHEN OPEN' : 'KITCHEN CLOSED'}</span>
+            </button>
+
             {/* Orders Nav Button */}
             <Link
               href="/"

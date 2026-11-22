@@ -18,6 +18,23 @@ A dedicated, ultra-simple, high-contrast, standalone **Kitchen POS & Admin Web A
 
 ---
 
+## 🛡️ Critical Kitchen Operational Safeguards
+
+1. **Kitchen Open / Closed Master Switch (`POSHeader.tsx`):**
+   - Live Supabase connection and Realtime subscription to `store_settings` (`id = 1`).
+   - One-tap toggle between **`KITCHEN OPEN`** (Green) and **`KITCHEN CLOSED`** (Red) immediately pauses or resumes incoming orders across the entire customer ordering ecosystem.
+
+2. **Screen Wake Lock & 12s Repeating Alarm (`/`):**
+   - **Screen Wake Lock API:** Automatically acquires browser screen wake lock (`navigator.wakeLock.request('screen')`) and re-acquires on tab visibility change so kitchen tablets and phones never sleep during service.
+   - **Repeating Alarm:** Whenever any order has `order_status === 'NEW'`, the loud Web Audio chime alert automatically sounds every 12 seconds with high-visibility alert banners until staff taps **`ACCEPT ORDER`**.
+
+3. **UPI Payment Verification Gatekeeping (`OrderCard.tsx`):**
+   - For all orders with `payment_method === 'UPI'` and `payment_status !== 'PAID'`:
+     - Flashes high-visibility banner: **`⚠️ VERIFY ₹<total> IN GPAY/PHONEPE BEFORE BAKING`**.
+     - Gatekeeps order acceptance: tapping `ACCEPT ORDER` requires confirmation, or staff can tap **`Mark UPI as Paid`** to verify immediately.
+
+---
+
 ## 🌟 Core Features
 
 ### 1. Simple Login Screen (`/login`)

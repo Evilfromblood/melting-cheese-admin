@@ -65,3 +65,10 @@ export interface DaySummary {
   pendingUpiOrdersCount: number;
   pendingUpiAmount: number;
 }
+
+export interface StoreSettings {
+  id: number;
+  is_open: boolean;
+  closed_message?: string | null;
+  updated_at?: string;
+}

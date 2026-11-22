@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Phone, MapPin, Clock, Truck, Check, QrCode, Banknote, CheckCircle, Flame, ExternalLink, XCircle, MessageSquare } from 'lucide-react';
+import { Phone, MapPin, Clock, Truck, Check, QrCode, Banknote, CheckCircle, Flame, ExternalLink, XCircle, MessageSquare, AlertTriangle } from 'lucide-react';
 import { Order, OrderStatus, PaymentStatus } from '@/types';
 import { buildCustomerWhatsAppUrl, getFriendlyStatusText } from '@/lib/whatsapp';
 
@@ -21,6 +21,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const isOutForDelivery = order.order_status === 'OUT_FOR_DELIVERY';
   const isDelivered = order.order_status === 'DELIVERED';
   const isCancelled = order.order_status === 'CANCELLED';
+
+  const isUpiPending = order.payment_method === 'UPI' && order.payment_status !== 'PAID';
 
   // Compute elapsed time since order placed
   const orderDate = new Date(order.created_at);
@@ -62,6 +64,19 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
   const mapsUrl = order.gps_link || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address + ', Bhadohi')}`;
   const whatsAppUrl = buildCustomerWhatsAppUrl(order);
+
+  // Gatekeeping for Accept Order button when UPI is pending
+  const handleAcceptOrder = () => {
+    if (isUpiPending) {
+      const confirmed = window.confirm(
+        `⚠️ CAUTION: UPI Payment of ₹${order.total} is still UNVERIFIED!\n\nHave you verified ₹${order.total} received in GPay / PhonePe?\n\n• Click OK to accept and begin baking anyway.\n• Click Cancel to verify payment first.`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    onUpdateStatus(order.id, 'PREPARING');
+  };
 
   return (
     <div className={`rounded-3xl p-4 sm:p-6 transition-all duration-300 flex flex-col justify-between gap-4 ${cardTheme}`}>
@@ -131,7 +146,15 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       </div>
 
-      {/* 2. Customer Details Card with Large Quick Action Buttons (Min 48px) */}
+      {/* 2. CRITICAL SAFEGUARD: UPI Payment Verification Warning Banner */}
+      {isUpiPending && (
+        <div className="p-3 sm:p-3.5 bg-amber-500/20 border-2 border-amber-500 rounded-2xl text-amber-300 font-black text-xs sm:text-sm flex items-center gap-2.5 shadow-lg shadow-amber-950/40 animate-pulse">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 stroke-[2.5]" />
+          <span>⚠️ VERIFY ₹{order.total} IN GPAY/PHONEPE BEFORE BAKING</span>
+        </div>
+      )}
+
+      {/* 3. Customer Details Card with Large Quick Action Buttons (Min 48px) */}
       <div className="bg-black/40 rounded-2xl p-3.5 sm:p-4 border border-stone-800/80 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -152,7 +175,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
           <span className="font-medium leading-relaxed">{order.delivery_address}</span>
         </div>
 
-        {/* 1-Tap Action Row: Call, Maps Pin, and WhatsApp Business Status Update (Min 48px height) */}
+        {/* 1-Tap Action Row: Call & Open Maps Pin */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
           {/* Call Customer Button */}
           <a
@@ -189,11 +212,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </a>
 
         {/* 1-Tap Mark UPI Paid Button if unpaid UPI */}
-        {order.payment_method === 'UPI' && order.payment_status === 'PENDING' && (
+        {isUpiPending && (
           <button
             type="button"
             onClick={() => onTogglePaymentStatus(order.id, 'PENDING')}
-            className="w-full min-h-[48px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-stone-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 border-2 border-amber-300 transition-all uppercase tracking-wide"
+            className="w-full min-h-[48px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-stone-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 border-2 border-amber-300 transition-all uppercase tracking-wide cursor-pointer"
           >
             <QrCode className="w-5 h-5 stroke-[2.5]" />
             <span>Mark UPI as Paid (₹{order.total})</span>
@@ -210,7 +233,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <button
               type="button"
               onClick={() => onTogglePaymentStatus(order.id, 'PAID')}
-              className="text-[11px] underline text-stone-400 hover:text-stone-200"
+              className="text-[11px] underline text-stone-400 hover:text-stone-200 cursor-pointer"
             >
               Undo
             </button>
@@ -218,7 +241,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         )}
       </div>
 
-      {/* 3. Items Ordered List - Ultra High Contrast & Readability */}
+      {/* 4. Items Ordered List - Ultra High Contrast & Readability */}
       <div className="space-y-2">
         <div className="text-xs font-black text-stone-400 uppercase tracking-wider flex items-center justify-between">
           <span>Items Ordered ({order.items ? order.items.length : 0})</span>
@@ -272,17 +295,21 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </div>
       </div>
 
-      {/* 4. Kitchen Stage Advancement Buttons - MINIMUM 52px HEIGHT FOR RAPID TAPS */}
+      {/* 5. Kitchen Stage Advancement Buttons - MINIMUM 52px HEIGHT FOR RAPID TAPS */}
       <div className="space-y-2 pt-1 border-t border-stone-800/80">
-        {/* NEW ORDER -> ACCEPT ORDER */}
+        {/* NEW ORDER -> ACCEPT ORDER (With UPI Verification Gatekeeping) */}
         {isNew && (
           <button
             type="button"
-            onClick={() => onUpdateStatus(order.id, 'PREPARING')}
-            className="w-full min-h-[52px] px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white font-black text-base sm:text-lg flex items-center justify-center gap-3 shadow-xl shadow-blue-600/30 border-2 border-blue-400 transition-all uppercase tracking-wide cursor-pointer"
+            onClick={handleAcceptOrder}
+            className={`w-full min-h-[52px] px-5 py-3 rounded-2xl font-black text-base sm:text-lg flex items-center justify-center gap-3 shadow-xl border-2 transition-all uppercase tracking-wide cursor-pointer active:scale-95 ${
+              isUpiPending
+                ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-stone-950 border-amber-300 shadow-amber-600/30'
+                : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-blue-400 shadow-blue-600/30'
+            }`}
           >
             <Clock className="w-6 h-6 stroke-[2.5]" />
-            <span>ACCEPT ORDER</span>
+            <span>{isUpiPending ? 'ACCEPT ORDER (UPI PENDING ⚠️)' : 'ACCEPT ORDER'}</span>
           </button>
         )}
 
